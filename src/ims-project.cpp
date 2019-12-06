@@ -7,6 +7,14 @@ using namespace std;
 
 Facility StartYear("StartYear");
 Facility EndYear("EndYear");
+int yearCnt = 0;
+unsigned long petrol_cars = DEFAULT_PETROL_CARS_NUM;
+unsigned long electric_cars = DEFAULT_ELECTRIC_CARS_NUM;
+
+double petrol_after_petrol = DEFAULT_AFTER_PETROL_PERCENTAGE;
+double petrol_after_electric = DEFAULT_AFTER_ELECTRIC_PERCENTAGE;
+
+unsigned long CO2 = 0;
 
 
 void handle_err(int err_code) {
@@ -39,20 +47,129 @@ void print_sim_start(double pp, double ep, double pe, double ee) {
 }
 
 
+bool too_old_car(double type) {
+    if (Random() > type) {
+        return true;
+    } else {
+        return false;
+    }
+}
 
 
-class YearTimer: public Process {
+bool choose_new_engine(double percentage) {
+    if (Random() <= (percentage / 100)) {
+        return true;    // choose new petrol
+    } else {
+        return false;   // choose new electric
+    }
+}
+
+
+class PetrolCar: public Process {
 
 public:
     void Behavior() {
-        cout << "Rok\n";
-        Release(EndYear);
-        Activate(Time+1);
-        Seize(EndYear);
+        Priority = 1;
+
+        newYearPetrol:
+        
+        
+
+        for (unsigned long i = 0; i < petrol_cars; i++) {
+            if (too_old_car(TOO_OLD_PETROL_CAR)) {
+                petrol_cars--;
+
+                for (int j = 0; j < 2; j++) {
+                    if (choose_new_engine(petrol_after_petrol)) {
+                        petrol_cars++;
+                        CO2 += CO2_NEW_PETROL;
+                    } else {
+                        electric_cars++;
+                        CO2 += CO2_NEW_ELECTRIC;
+                    }
+                }
+            }
+        }
+
+
+        Passivate();
+        
+        goto newYearPetrol;
+    }       
+
+};
+
+
+class ElectricCar: public Process {
+
+public:
+    void Behavior() {
+        Priority = 2;
+
+        newYearElectric:
+        
+
+        for (unsigned long i = 0; i < electric_cars; i++) {
+            if (too_old_car(TOO_OLD_ELECTRIC_CAR)) {
+                electric_cars--;
+
+                for (int j = 0; j < 2; j++) {
+                    if (choose_new_engine(petrol_after_electric)) {
+                        petrol_cars++;
+                        CO2 += CO2_NEW_PETROL;
+                    } else {
+                        electric_cars++;
+                        CO2 += CO2_NEW_ELECTRIC;
+                    }
+                }
+            } else {
+                if (this->too_old_battery()) {
+                    CO2 += CO2_NEW_BATTERY;
+                }
+            }
+        }
+
+
+        
+        Passivate();
+        
+        goto newYearElectric;
     }
 
+    bool too_old_battery() {
+    if (Random() < TOO_OLD_BATTERY) {
+        return true;
+    } else {
+        return false;
+    }
+}
+        
+
+};
 
 
+
+
+class YearTimer: public Event {
+
+public:
+    PetrolCar* p_car = new PetrolCar;
+    ElectricCar* e_car = new ElectricCar;
+    void Behavior() {
+        
+        cout << "rok " << yearCnt++ << endl;
+
+        p_car->Activate();
+        e_car->Activate();
+
+        cout << "benzinove: " << petrol_cars << endl;
+        cout << "elektricke: " << electric_cars << endl;
+        Activate(Time + NEXT_YEAR);
+        
+    }
+
+private:
+    const double NEXT_YEAR = 1.0;
 };
 
 
@@ -62,14 +179,10 @@ public:
 
 
 int main(int argc, char** argv){
-
-    unsigned long petrol_cars = DEFAULT_PETROL_CARS_NUM;
-    unsigned long electric_car = DEFAULT_ELECTRIC_CARS_NUM;
+    
     double length_od_sim = DEFAULT_LENGTH;
 
-    double petrol_after_petrol = DEFAULT_AFTER_PETROL_PERCENTAGE;
     double electric_after_petrol;
-    double petrol_after_electric = DEFAULT_AFTER_ELECTRIC_PERCENTAGE;
     double electric_after_electric;
 
 
@@ -124,7 +237,7 @@ int main(int argc, char** argv){
 
 
     Init(SIM_START, length_od_sim);
-    (new YearTimer)->Activate();
+    (new YearTimer)->Activate();  
     Run();
 
 
