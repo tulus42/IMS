@@ -7,7 +7,7 @@ using namespace std;
 
 Facility StartYear("StartYear");
 Facility EndYear("EndYear");
-int yearCnt = 0;
+int yearCnt = 2018;
 unsigned long petrol_cars = DEFAULT_PETROL_CARS_NUM;
 unsigned long electric_cars = DEFAULT_ELECTRIC_CARS_NUM;
 
@@ -91,7 +91,10 @@ public:
             }
         }
 
-
+        for (unsigned long i = 0; i < electric_cars; i++) {
+            CO2 += CO2_PETROL_FUEL;
+            CO2 += CO2_PETROL_DRIVE;
+        }
         Passivate();
         
         goto newYearPetrol;
@@ -129,12 +132,15 @@ public:
             }
         }
 
+        for (unsigned long i = 0; i < electric_cars; i++) {
+            CO2 += CO2_ELECTRIC_ENERGY;
+        }
 
-        
         Passivate();
         
         goto newYearElectric;
     }
+
 
     bool too_old_battery() {
     if (Random() < TOO_OLD_BATTERY) {
@@ -153,19 +159,36 @@ public:
 class YearTimer: public Event {
 
 public:
+    unsigned long yearCO2;
     PetrolCar* p_car = new PetrolCar;
     ElectricCar* e_car = new ElectricCar;
-    void Behavior() {
-        
-        cout << "rok " << yearCnt++ << endl;
+    Stat* CO2Stat = new Stat("Year CO2");
 
+    void Behavior() {
+    
         p_car->Activate();
         e_car->Activate();
 
-        cout << "benzinove: " << petrol_cars << endl;
-        cout << "elektricke: " << electric_cars << endl;
+        
+        cout << "-------------------------------------------------------------" << endl;
+        cout << "---                  Year " << yearCnt++ << "                            ---" << endl;
+        cout << "- Number of petrol cars:      " << petrol_cars << endl;
+        cout << "- Number of electric cars:    " << electric_cars << endl;
+
+        cout << "ročné emisie:   " << (CO2 - yearCO2) / 1000 << " t" << endl;
+        cout << "celkové emisie: " << CO2 / 1000 << " t" << endl;
+        
+
+        if (CO2 -yearCO2 != 0)
+            (*CO2Stat)((CO2 - yearCO2)/1000);
+        yearCO2 = CO2;
         Activate(Time + NEXT_YEAR);
         
+        
+    }
+
+    ~YearTimer() {
+        CO2Stat->Output();
     }
 
 private:
@@ -233,13 +256,15 @@ int main(int argc, char** argv){
     electric_after_petrol = 100.0 - petrol_after_petrol;
     electric_after_electric = 100.0 - petrol_after_electric;
 
-    print_sim_start(petrol_after_petrol, electric_after_petrol, petrol_after_electric, electric_after_electric);
 
+
+    print_sim_start(petrol_after_petrol, electric_after_petrol, petrol_after_electric, electric_after_electric);
 
     Init(SIM_START, length_od_sim);
     (new YearTimer)->Activate();  
     Run();
 
+    SIMLIB_statistics.Output();
 
     return 0;
 }
